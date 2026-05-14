@@ -1,7 +1,9 @@
 import logging
+import math
 import os
 import warnings
 from datetime import datetime
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 
@@ -75,6 +77,78 @@ def make_market_info(float_mv_yuan, amount_yuan):
         "float_mv_yuan": float(float_mv_yuan) if float_mv_yuan is not None else None,
         "amount_yuan": float(amount_yuan) if amount_yuan is not None else None,
     }
+
+
+def fetch_sh_sz_daily_stock_info_from_tushare(trade_date: str, tushare_pro):
+    if tushare_pro is None:
+        return None, None, {}
+    try:
+        df = tushare_pro.daily(trade_date=trade_date.replace("-", ""))
+        if df is None or df.empty:
+            LOGGER.warning("%s Tushare daily 返回空数据", trade_date)
+            return None, None, {}
+        required_columns = {"ts_code", "amount", "pct_chg"}
+        if not required_columns.issubset(df.columns):
+            LOGGER.warning("%s Tushare daily 缺少必要字段：%s", trade_date, list(df.columns))
+            return None, None, {}
+
+        rows = df.copy()
+        rows["ts_code"] = rows["ts_code"].astype(str).str.upper()
+        rows = rows[rows["ts_code"].str.endswith((".SZ", ".SH"), na=False)].copy()
+        if rows.empty:
+            LOGGER.warning("%s Tushare daily 过滤沪深股票后无数据", trade_date)
+            return None, None, {}
+
+        rows["amount"] = pd.to_numeric(rows["amount"], errors="coerce")
+        rows["pct_chg"] = pd.to_numeric(rows["pct_chg"], errors="coerce")
+        rows = rows.dropna(subset=["amount"])
+        if rows.empty:
+            LOGGER.warning("%s Tushare daily amount 标准化后无有效数据", trade_date)
+            return None, None, {}
+
+        rows = rows.sort_values("amount", ascending=False)
+        top5pct_count = max(1, math.ceil(len(rows) * 0.05))
+        top5pct_amount_yuan = float(rows.head(top5pct_count)["amount"].sum() * 1000)
+        total_amount_yuan = float(rows["amount"].sum() * 1000)
+        top5_pct_chg = {}
+        for _, row in rows.head(5).iterrows():
+            amount_yuan = None if pd.isna(row["amount"]) else float(row["amount"] * 1000)
+            pct_chg = None if pd.isna(row["pct_chg"]) else float(row["pct_chg"])
+            top5_pct_chg[row["ts_code"]] = [amount_yuan, pct_chg]
+        return top5pct_amount_yuan, total_amount_yuan, top5_pct_chg
+    except Exception as exc:
+        LOGGER.warning("%s Tushare daily 个股成交集中度获取失败：%s", trade_date, exc)
+        return None, None, {}
+
+
+@lru_cache(maxsize=1)
+def get_ashare_stock_code_name_map_from_akshare():
+    df = ak.stock_info_a_code_name()
+    if df is None or df.empty:
+        return {}
+    if "code" not in df.columns or "name" not in df.columns:
+        LOGGER.warning("A股股票代码名称表缺少 code/name 字段：%s", list(df.columns))
+        return {}
+    return {
+        str(row["code"]).strip().zfill(6): str(row["name"]).strip()
+        for _, row in df.dropna(subset=["code", "name"]).iterrows()
+    }
+
+
+def fetch_ashare_stock_code_name_from_akshare(stock_code):
+    code = str(stock_code or "").strip()
+    if not code:
+        return ""
+    if len(code) >= 8 and code[:2].isalpha():
+        code = code[2:]
+    if "." in code and len(code.rsplit(".", 1)[-1]) == 2 and code.rsplit(".", 1)[-1].isalpha():
+        code = code.rsplit(".", 1)[0]
+    code = code.strip().zfill(6)
+    try:
+        return get_ashare_stock_code_name_map_from_akshare().get(code, "")
+    except Exception as exc:
+        LOGGER.warning("%s A股股票名称获取失败：%s", stock_code, exc)
+        return ""
 
 
 def fetch_sh_sz_daily_float_mv_amount_from_tushare(trade_date: str, tushare_pro):

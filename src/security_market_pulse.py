@@ -20,7 +20,9 @@ from config.consts import START_DATE  # noqa: E402
 from config.index_code import index_dict  # noqa: E402
 from src.market_daily_info import (  # noqa: E402
     REQUEST_SLEEP_SECONDS,
+    fetch_ashare_stock_code_name_from_akshare,
     fetch_index_full_from_akshare,
+    fetch_sh_sz_daily_stock_info_from_tushare,
     fetch_sh_daily_float_mv_amount_from_sse_official,
     fetch_sh_sz_daily_float_mv_amount_from_tushare,
     fetch_sh_sz_full_margin_balance_from_akshare,
@@ -99,14 +101,19 @@ def init_db(db_path: str) -> sqlite3.Connection:
             szse_amount_yuan REAL,
             sse_circulating_market_cap_yuan REAL,
             szse_circulating_market_cap_yuan REAL,
+            top5pct_concentration REAL,
+            top5_stocks TEXT,
             margin_updated_at TEXT,
             sse_updated_at TEXT,
             szse_updated_at TEXT,
             sse_market_cap_updated_at TEXT,
-            szse_market_cap_updated_at TEXT
+            szse_market_cap_updated_at TEXT,
+            top5pct_concentration_updated_at TEXT,
+            top5_stocks_updated_at TEXT
         )
         """
     )
+    ensure_ashare_daily_market_data_columns(conn)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS index_daily_data (
@@ -130,6 +137,24 @@ def init_db(db_path: str) -> sqlite3.Connection:
     )
     conn.commit()
     return conn
+
+
+def ensure_ashare_daily_market_data_columns(conn: sqlite3.Connection) -> None:
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(ashare_daily_market_data)").fetchall()
+    }
+    column_sql = {
+        "top5pct_concentration": "ALTER TABLE ashare_daily_market_data ADD COLUMN top5pct_concentration REAL",
+        "top5_stocks": "ALTER TABLE ashare_daily_market_data ADD COLUMN top5_stocks TEXT",
+        "top5pct_concentration_updated_at": (
+            "ALTER TABLE ashare_daily_market_data ADD COLUMN top5pct_concentration_updated_at TEXT"
+        ),
+        "top5_stocks_updated_at": "ALTER TABLE ashare_daily_market_data ADD COLUMN top5_stocks_updated_at TEXT",
+    }
+    for column, sql in column_sql.items():
+        if column not in existing_columns:
+            conn.execute(sql)
 
 
 def get_pending_ashare_market_dates(conn: sqlite3.Connection, fallback_start_date: str) -> list[str]:
@@ -288,6 +313,102 @@ def update_ashare_daily_market_data(conn: sqlite3.Connection, start_date: str) -
         time.sleep(REQUEST_SLEEP_SECONDS)
 
     LOGGER.info("沪深成交额和流通市值更新完成：写入 %s 条，跳过 %s 条", updated_count, skipped_count)
+    return updated_count, skipped_count
+
+
+def get_pending_top_concentration_dates(conn: sqlite3.Connection, fallback_start_date: str) -> list[str]:
+    null_rows = conn.execute(
+        """
+        SELECT trade_date
+        FROM ashare_daily_market_data
+        WHERE trade_date >= ?
+          AND top5pct_concentration IS NULL
+        """,
+        (fallback_start_date,),
+    ).fetchall()
+    pending = {row["trade_date"] for row in null_rows}
+
+    max_row = conn.execute(
+        """
+        SELECT MAX(trade_date) AS max_trade_date
+        FROM ashare_daily_market_data
+        WHERE top5pct_concentration IS NOT NULL
+        """
+    ).fetchone()
+    max_trade_date = max_row["max_trade_date"] if max_row else None
+    if max_trade_date:
+        next_day = (datetime.strptime(max_trade_date, "%Y-%m-%d").date() + timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        next_day = fallback_start_date
+
+    today = today_text()
+    if next_day <= today:
+        pending.update(iter_date_texts(next_day, today))
+
+    return sorted(date_text for date_text in pending if date_text >= fallback_start_date)
+
+
+def upsert_top_concentration_record(conn: sqlite3.Connection, record: dict) -> bool:
+    if record.get("top5pct_concentration") is None:
+        return False
+
+    now = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO ashare_daily_market_data (
+            trade_date, top5pct_concentration, top5_stocks,
+            top5pct_concentration_updated_at, top5_stocks_updated_at
+        )
+        VALUES (
+            :trade_date, :top5pct_concentration, :top5_stocks,
+            :top5pct_concentration_updated_at, :top5_stocks_updated_at
+        )
+        ON CONFLICT(trade_date) DO UPDATE SET
+            top5pct_concentration = excluded.top5pct_concentration,
+            top5_stocks = excluded.top5_stocks,
+            top5pct_concentration_updated_at = excluded.top5pct_concentration_updated_at,
+            top5_stocks_updated_at = excluded.top5_stocks_updated_at
+        """,
+        {
+            **record,
+            "top5pct_concentration_updated_at": now,
+            "top5_stocks_updated_at": now,
+        },
+    )
+    return True
+
+
+def update_top_concentration(conn: sqlite3.Connection, start_date: str) -> tuple[int, int]:
+    pending_dates = get_pending_top_concentration_dates(conn, start_date)
+    if not pending_dates:
+        LOGGER.info("Top5%% 成交集中度无待更新日期")
+        return 0, 0
+
+    LOGGER.info("待更新 Top5%% 成交集中度日期数：%s", len(pending_dates))
+    tushare_pro = get_tushare_pro()
+    updated_count = 0
+    skipped_count = 0
+    for trade_date in pending_dates:
+        top5pct_amount_yuan, total_amount_yuan, top5_pct_chg = fetch_sh_sz_daily_stock_info_from_tushare(
+            trade_date,
+            tushare_pro,
+        )
+        top5pct_concentration = None
+        if total_amount_yuan not in (None, 0) and top5pct_amount_yuan is not None:
+            top5pct_concentration = top5pct_amount_yuan / total_amount_yuan
+        record = {
+            "trade_date": trade_date,
+            "top5pct_concentration": top5pct_concentration,
+            "top5_stocks": json.dumps(top5_pct_chg, ensure_ascii=False) if top5_pct_chg else None,
+        }
+        if upsert_top_concentration_record(conn, record):
+            updated_count += 1
+            conn.commit()
+        else:
+            skipped_count += 1
+        time.sleep(REQUEST_SLEEP_SECONDS)
+
+    LOGGER.info("Top5%% 成交集中度更新完成：写入 %s 条，跳过 %s 条", updated_count, skipped_count)
     return updated_count, skipped_count
 
 
@@ -481,6 +602,58 @@ def load_margin_chart_data(conn: sqlite3.Connection, start_date: str) -> list[di
     return data
 
 
+def load_top_concentration_data(conn: sqlite3.Connection, start_date: str) -> dict:
+    rows = conn.execute(
+        """
+        SELECT trade_date, top5pct_concentration, top5_stocks
+        FROM ashare_daily_market_data
+        WHERE trade_date >= ?
+          AND top5pct_concentration IS NOT NULL
+        ORDER BY trade_date
+        """,
+        (start_date,),
+    ).fetchall()
+
+    chart = []
+    recent_tables = []
+    for row in rows:
+        chart.append(
+            {
+                "date": row["trade_date"],
+                "value": round(float(row["top5pct_concentration"]), 6),
+            }
+        )
+
+    rows_with_stocks = [row for row in rows if row["top5_stocks"]]
+    for row in reversed(rows_with_stocks[-5:]):
+        try:
+            stock_map = json.loads(row["top5_stocks"])
+        except (TypeError, json.JSONDecodeError):
+            stock_map = {}
+        stocks = []
+        for ts_code, values in stock_map.items():
+            amount_yuan = None
+            pct_chg = None
+            if isinstance(values, list):
+                amount_yuan = values[0] if len(values) > 0 else None
+                pct_chg = values[1] if len(values) > 1 else None
+            stock_name = fetch_ashare_stock_code_name_from_akshare(ts_code) or ts_code
+            stocks.append(
+                {
+                    "tsCode": ts_code,
+                    "name": stock_name,
+                    "amountYuan": amount_yuan,
+                    "pctChg": pct_chg,
+                }
+            )
+        recent_tables.append({"date": row["trade_date"], "stocks": stocks})
+
+    return {
+        "chart": chart,
+        "recentTables": recent_tables,
+    }
+
+
 def build_dashboard_payload(conn: sqlite3.Connection, start_date: str) -> dict:
     return {
         "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -488,6 +661,7 @@ def build_dashboard_payload(conn: sqlite3.Connection, start_date: str) -> dict:
         "indexDeviation": load_index_chart_data(conn, start_date),
         "turnover": load_turnover_chart_data(conn, start_date),
         "margin": load_margin_chart_data(conn, start_date),
+        "topConcentration": load_top_concentration_data(conn, start_date),
     }
 
 
@@ -633,6 +807,48 @@ HTML_TEMPLATE = """<!doctype html>
       width: 100%;
       height: 380px;
     }
+    .top-stock-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .top-stock-table {
+      min-width: 0;
+      border: 1px solid var(--grid);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .top-stock-date {
+      padding: 10px 12px 4px;
+      color: #bd3c2f;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .top-stock-table table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+    .top-stock-table th,
+    .top-stock-table td {
+      padding: 8px 10px;
+      border-top: 1px solid var(--grid);
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .top-stock-table th:first-child,
+    .top-stock-table td:first-child {
+      text-align: left;
+    }
+    .top-stock-table th {
+      color: var(--text-soft);
+      font-weight: 600;
+      background: #fafafa;
+    }
     svg {
       display: block;
       width: 100%;
@@ -754,6 +970,7 @@ HTML_TEMPLATE = """<!doctype html>
       .chart-card { padding: 16px; }
       .chart { height: 320px; }
       .index-panel .chart { height: 280px; }
+      .top-stock-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -767,6 +984,7 @@ HTML_TEMPLATE = """<!doctype html>
       <button class="tab-button" type="button" data-tab="indexPanel" aria-selected="true">指数 MA60 偏离度</button>
       <button class="tab-button" type="button" data-tab="marginPanel" aria-selected="false">融资余额与流通市值占比</button>
       <button class="tab-button" type="button" data-tab="turnoverPanel" aria-selected="false">沪深成交金额</button>
+      <button class="tab-button" type="button" data-tab="topConcentrationPanel" aria-selected="false">沪深成交集中度</button>
     </nav>
 
     <div class="tab-panel active index-panel" id="indexPanel"></div>
@@ -800,6 +1018,24 @@ HTML_TEMPLATE = """<!doctype html>
         <div class="legend" id="turnoverLegend"></div>
       </div>
     </div>
+
+    <div class="tab-panel" id="topConcentrationPanel">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 class="chart-title">Top5%成交集中度</h2>
+          <div class="chart-latest" id="topConcentrationLatest"></div>
+        </div>
+        <div class="chart" id="topConcentrationChart"></div>
+        <div class="legend" id="topConcentrationLegend"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 class="chart-title">最近五个交易日成交金额 Top5 股票</h2>
+          <div class="chart-latest"></div>
+        </div>
+        <div class="top-stock-grid" id="topStockTables"></div>
+      </div>
+    </div>
   </main>
   <script>
     const payload = __PAYLOAD__;
@@ -807,6 +1043,11 @@ HTML_TEMPLATE = """<!doctype html>
     const parseDate = value => new Date(value + "T00:00:00");
     const fmtNumber = (value, digits = 2) => Number(value).toLocaleString("zh-CN", { maximumFractionDigits: digits, minimumFractionDigits: digits });
     const fmtPercent = value => (Number(value) * 100).toFixed(2) + "%";
+    const fmtPctChg = value => {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "";
+      return `${number > 0 ? "+" : ""}${number.toFixed(2)}%`;
+    };
     const renderedTabs = new Set();
 
     document.getElementById("meta").textContent = ``;
@@ -897,6 +1138,16 @@ HTML_TEMPLATE = """<!doctype html>
       }
       if (!result.some(value => Math.abs(value) < 0.000001)) result.push(0);
       return result.sort((a, b) => a - b);
+    }
+
+    function positivePercentTicks(values, step = 0.1) {
+      const nums = values.map(Number).filter(value => Number.isFinite(value));
+      const upper = Math.max(step, Math.ceil(Math.max(...nums, step) / step) * step);
+      const result = [];
+      for (let value = 0; value <= upper + step / 2; value += step) {
+        result.push(Number(value.toFixed(4)));
+      }
+      return result;
     }
 
     function makeSvg(container) {
@@ -1284,6 +1535,66 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
+    function renderTopStockTables() {
+      const container = document.getElementById("topStockTables");
+      const tables = payload.topConcentration?.recentTables || [];
+      if (!tables.length) {
+        container.innerHTML = '<div class="empty"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>暂无可展示数据</div>';
+        return;
+      }
+      container.innerHTML = tables.map(table => `
+        <div class="top-stock-table">
+          <div class="top-stock-date">${table.date}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>股票名称</th>
+                <th>成交金额</th>
+                <th>涨跌幅</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(table.stocks || []).map(stock => `
+                <tr>
+                  <td title="${stock.tsCode}">${stock.name || stock.tsCode}</td>
+                  <td>${fmtNumber(Number(stock.amountYuan || 0) / 100000000, 2)}亿</td>
+                  <td>${fmtPctChg(stock.pctChg)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `).join("");
+    }
+
+    function renderTopConcentrationChart() {
+      if (renderedTabs.has("topConcentration")) return;
+      renderedTabs.add("topConcentration");
+      const points = (payload.topConcentration?.chart || [])
+        .map(row => ({ date: row.date, value: Number(row.value) }))
+        .filter(point => Number.isFinite(point.value));
+      const concentrationTicks = positivePercentTicks(points.map(point => point.value), 0.1);
+      renderLineChart({
+        containerId: "topConcentrationChart",
+        legendId: "topConcentrationLegend",
+        latestId: "topConcentrationLatest",
+        title: "Top5%成交集中度",
+        leftDomain: [concentrationTicks[0], concentrationTicks[concentrationTicks.length - 1]],
+        leftTicks: concentrationTicks,
+        referenceLines: concentrationTicks,
+        areaSeries: "Top5%成交集中度",
+        series: [
+          { name: "Top5%成交集中度", color: "#00754A", points }
+        ],
+        leftFormat: fmtPercent,
+        latestAnnotation: true,
+        latestAnnotationFormat: point => fmtPercent(point.value),
+        tooltip: (date, rows) => `<strong>${date}</strong>集中度：${fmtPercent(rows[0]?.value || 0)}`,
+        latestText: (date, rows) => ``
+      });
+      renderTopStockTables();
+    }
+
     function renderTab(tabId) {
       if (tabId === "indexPanel") {
         renderIndexCharts();
@@ -1291,6 +1602,8 @@ HTML_TEMPLATE = """<!doctype html>
         renderMarginChart();
       } else if (tabId === "turnoverPanel") {
         renderTurnoverChart();
+      } else if (tabId === "topConcentrationPanel") {
+        renderTopConcentrationChart();
       }
     }
 
@@ -1314,6 +1627,7 @@ def main():
     try:
         if not args.skip_fetch:
             update_ashare_daily_market_data(conn, args.start_date)
+            update_top_concentration(conn, args.start_date)
             update_margin_balance(conn)
             update_index_daily_data(conn)
         payload = build_dashboard_payload(conn, args.start_date)
