@@ -1,0 +1,23 @@
+.tabs {
+  margin: 0 -28rpx 24rpx;
+  padding-left: 28rpx;
+  white-space: nowrap;
+}
+
+.tab {
+  display: inline-block;
+  margin-right: 16rpx;
+  padding: 14rpx 22rpx;
+  border: 1rpx solid #dce8df;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #5a6b61;
+  font-size: 26rpx;
+}
+
+.tab-active {
+  border-color: #2f8f57;
+  background: #e8f5ed;
+  color: #1f6f43;
+  font-weight: 700;
+}

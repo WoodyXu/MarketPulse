@@ -1,0 +1,11 @@
+<view class="page home-page">
+  <view class="page-title">MarketPulse</view>
+  <view class="page-subtitle">市场脉搏</view>
+
+  <block wx:for="{{boards}}" wx:key="title">
+    <view class="panel board-entry" bindtap="openBoard" data-path="{{item.path}}">
+      <text class="panel-title">{{item.title}}</text>
+      <text class="panel-desc">{{item.desc}}</text>
+    </view>
+  </block>
+</view>

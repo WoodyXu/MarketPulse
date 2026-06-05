@@ -1,0 +1,10 @@
+{
+  "name": "get-dashboard-section",
+  "version": "0.1.0",
+  "description": "MarketPulse WeChat cloud function skeleton for dashboard section access.",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "wx-server-sdk": "^3.0.1"
+  }
+}

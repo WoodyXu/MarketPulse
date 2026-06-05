@@ -1,0 +1,15 @@
+<view class="page">
+  <view class="page-title">北京楼市</view>
+  <view class="page-subtitle">成交、挂牌、看房与信贷看板</view>
+
+  <scroll-view class="tabs" scroll-x="true">
+    <block wx:for="{{tabs}}" wx:key="key">
+      <view class="tab {{activeTab === item.key ? 'tab-active' : ''}}">{{item.title}}</view>
+    </block>
+  </scroll-view>
+
+  <view class="panel">
+    <text class="panel-title">工程骨架已初始化</text>
+    <text class="placeholder">第 10 步仅创建页面与组件目录。登录、请求、缓存和图表渲染将在后续步骤实现。</text>
+  </view>
+</view>

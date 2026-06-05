@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "北京楼市",
+  "usingComponents": {
+    "ec-canvas": "/components/ec-canvas/ec-canvas"
+  }
+}
