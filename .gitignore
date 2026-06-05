@@ -3,6 +3,7 @@
 .pytest_cache/
 .claude/
 .venv/
+.workbuddy/
 __pycache__/
 *.pyc
 
@@ -10,3 +11,4 @@ data/
 pics/
 security_market_pulse/
 beijing_real_estate_market_pulse/
+PRD.md
