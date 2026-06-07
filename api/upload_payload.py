@@ -14,8 +14,10 @@ from typing import Any, Iterable, Optional
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+project_root_text = str(PROJECT_ROOT)
+if project_root_text in sys.path:
+    sys.path.remove(project_root_text)
+sys.path.insert(0, project_root_text)
 
 from config.consts import DB_PATH, START_DATE  # noqa: E402
 from src import beijing_real_estate_market_pulse, security_market_pulse  # noqa: E402

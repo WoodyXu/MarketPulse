@@ -4,7 +4,7 @@
 
 MarketPulse is currently a local Python data and static HTML dashboard project. The existing system reads from a local SQLite database, optionally fetches missing A-share data from external sources, builds dashboard payload dictionaries, and injects those payloads into static HTML templates embedded in the Python scripts.
 
-The WeChat mini program work now has a native mini program implementation under `miniprogram/`, with first-version login gating implemented on the home, capital market, and Beijing real estate pages. The shared request/cache utility layer is implemented, and both board pages use it for section-level tab loading. A centralized ECharts option construction layer under `miniprogram/utils/echarts-option.js` owns chart semantics and formatting. The capital market page renders the first-version capital market charts and recent Top5 stock tables; the Beijing real estate page renders real estate and resident-credit charts. Both board pages support section-scoped pull-to-refresh, explicit error states, and retry. All three pages expose fixed page-level share entries. End-to-end acceptance coverage verifies that one SQLite source produces identical HTML payloads and staged JSON, that the cloud function crops those payloads without changing business meaning, and that page render state preserves returned values. Mobile compatibility acceptance now covers 320 px and 390 px equivalent widths, horizontal tab/table reachability, bounded chart containers, loading/error states, and real-device debugging. WeChat Developer Tools opens from the repository root through `project.config.json`; local AppID/tool settings live in ignored `project.private.config.json`. The mini program continues to reuse the existing payload builders and `getDashboardSection` rather than rewriting data collection or calculation logic. Existing HTML output paths and template behavior remain unchanged.
+The WeChat mini program work now has a native mini program implementation under `miniprogram/`, with first-version login gating implemented on the home, capital market, and Beijing real estate pages. The shared request/cache utility layer is implemented, and both board pages use it for section-level tab loading. A centralized ECharts option construction layer under `miniprogram/utils/echarts-option.js` owns chart semantics and formatting. The capital market page renders the first-version capital market charts and recent Top5 stock tables; the Beijing real estate page renders real estate and resident-credit charts. Both board pages support section-scoped pull-to-refresh, explicit error states, and retry. All three pages expose fixed page-level share entries. End-to-end acceptance coverage verifies that one SQLite source produces identical HTML payloads and staged JSON, that the cloud function crops those payloads without changing business meaning, and that page render state preserves returned values. Mobile compatibility acceptance covers 320 px and 390 px equivalent widths, horizontal tab/table reachability, bounded chart containers, loading/error states, and real-device debugging. Pre-release security acceptance protects private configuration, databases, generated full payloads, the mini program package boundary, and cloud function response fields through explicit ignore rules and regression tests. Delivery documentation now defines the empty-environment payload generation, upload, cloud deployment, authenticated invocation, local debugging, preview, acceptance, and known-limitations workflow. WeChat Developer Tools opens from the repository root through `project.config.json`; local AppID/tool settings live in ignored `project.private.config.json`. The mini program continues to reuse the existing payload builders and `getDashboardSection` rather than rewriting data collection or calculation logic. Existing HTML output paths and template behavior remain unchanged.
 
 ## File roles
 
@@ -19,6 +19,7 @@ Key responsibilities:
 - Uses external fetch helpers from `src/market_daily_info.py` when `--skip-fetch` is not set.
 - Builds the capital market payload through `build_dashboard_payload()`.
 - Writes the existing capital market HTML dashboard through `generate_html()`.
+- Promotes the repository root to the front of `sys.path` when run as a script so external `PYTHONPATH` entries cannot redirect `config` or `src` imports to another project.
 
 Current payload fields:
 
@@ -44,6 +45,7 @@ Key responsibilities:
 - Builds weekday, daily, monthly, and credit chart payload data from existing database rows.
 - Builds the Beijing real estate payload through `build_dashboard_payload()`.
 - Writes the existing Beijing real estate HTML dashboard through `generate_html()`.
+- Promotes the repository root to the front of `sys.path` when run as a script so external `PYTHONPATH` entries cannot redirect `config` or `src` imports to another project.
 
 Current payload fields:
 
@@ -150,6 +152,8 @@ Key responsibilities:
 - Documents that successful cloud function responses contain only `type`, `section`, and current section `data`.
 - Documents that handled error responses contain only normalized `type`/`section` when available plus the error object.
 - Documents that `getDashboardSection` must not expose cloud storage paths, file IDs, download credentials, selected payload dates, or complete dashboard payloads.
+- Links to the complete delivery guide and records the required payload-first, manifest-last deployment order.
+- States that cloud environment IDs, shared test accounts, storage credentials, and provider-specific upload tools remain deployment-local concerns.
 
 ### `api/upload_payload.py`
 
@@ -172,6 +176,7 @@ Key responsibilities:
 - Accepts `--upload-command` for provider-specific upload integration. The command template supports `{local_path}`, `{cloud_path}`, and `{env_id}` placeholders.
 - Runs the optional upload command for each generated payload file and then for `marketpulse-payload/manifest.json`.
 - Logs clearly when no upload command is provided and only local staging is performed.
+- Promotes the repository root to the front of `sys.path` before importing project modules, preventing an external `PYTHONPATH` entry from loading another project's `config` package.
 
 Current boundary:
 
@@ -211,6 +216,10 @@ Key responsibilities:
 - Documents that the function reads `marketpulse-payload/manifest.json`, selects latest/exact/fallback payload dates from manifest metadata, and reads the selected dashboard JSON without cloud storage prefix enumeration.
 - Documents that the function crops the selected payload to the requested section without returning unrelated dashboard fields.
 - Documents response safety boundaries: successful responses only expose `type`, `section`, and `data`; handled error responses expose only normalized `type`/`section` when available and the error object; no cloud storage paths, file IDs, download credentials, selected payload dates, or complete dashboard payloads are returned.
+- Documents deployment through WeChat Developer Tools with cloud-side dependency installation.
+- Requires deployment into the same non-production cloud environment that contains the manifest and payload objects.
+- Directs real invocation checks through an authenticated mini program session so the runtime supplies `OPENID`.
+- Links to the complete delivery guide.
 
 ### `api/cloudfunctions/getDashboardSection/index.js`
 
@@ -323,6 +332,23 @@ Key responsibilities:
 - Keeps machine/user-specific Developer Tools settings outside version control.
 - May be rewritten by WeChat Developer Tools during preview or real-device debugging.
 - Is the only remaining private project configuration; duplicate configuration files under `miniprogram/` were removed.
+
+### `.gitignore`
+
+Repository boundary for local configuration, generated output, and private data.
+
+Key responsibilities:
+
+- Excludes `.env` and root `project.private.config.json`.
+- Excludes `data/` and generic SQLite/DB snapshots, including `-wal` and `-shm` sidecar files.
+- Excludes generated full dashboard payloads under `api/payload/`.
+- Excludes generated HTML dashboards, pictures, Python caches, virtual environments, and local tool state.
+
+Architecture insight:
+
+- `api/payload/` contains full dashboard payloads before cloud-function section cropping, so it is a private staging area rather than a source artifact.
+- Database ignore rules must cover both the configured `data/` directory and accidentally created snapshots elsewhere in the repository.
+- The public WeChat AppID may remain in `project.config.json`; environment IDs, tokens, secrets, credentials, and machine-specific settings belong outside tracked files.
 
 ### `miniprogram/pages/home/index.*`
 
@@ -615,6 +641,39 @@ Key responsibilities:
 - Verifies `manifest.json` contains latest file pointers, latest dates, available dates, and per-date file mappings.
 - Verifies manifest updates preserve existing dates and select the max business date as the latest.
 - Verifies `--upload-command` integration invokes uploads for generated payloads and then the manifest without executing real network calls.
+- Launches `api/upload_payload.py` as a subprocess with a conflicting external `config` package on `PYTHONPATH` and verifies the CLI still imports this repository's modules.
+
+### `docs/delivery-guide.md`
+
+Operational handoff guide for the first-version mini program.
+
+Key responsibilities:
+
+- Defines local Python, Node.js, SQLite, WeChat Developer Tools, developer-account, and non-production cloud-environment prerequisites.
+- Documents local HTML validation while preserving the existing HTML templates, output paths, and behavior.
+- Documents payload and manifest generation through `api/upload_payload.py`.
+- Documents manual cloud-storage upload and provider-neutral `--upload-command` integration.
+- Requires payload files to be uploaded before `manifest.json`, so the manifest never points to missing objects.
+- Documents `getDashboardSection` deployment with cloud-side dependency installation and authenticated invocation checks.
+- Documents repository-root mini program debugging, cache fallback, retry, pull-to-refresh, preview, and real-device acceptance.
+- Records the release commands, security checklist, test-environment ownership, and first-version known limitations.
+- Explicitly preserves the no-new-indicators boundary and keeps full staged payloads private.
+
+Architecture insight:
+
+- Delivery configuration is intentionally split: tracked documentation and public project structure live in the repository, while environment IDs, developer membership, storage ACLs, and credentials remain in the deployment environment.
+- Manifest upload is the publication boundary. Uploading it last makes a payload release visible only after all referenced objects exist.
+- A documented command is part of the supported interface; CLI entry points must resolve repository-local imports deterministically even when the caller has an unrelated `PYTHONPATH`.
+
+### `tests/test_delivery_documentation.py`
+
+Regression tests for implementation plan step 25 delivery documentation.
+
+Key responsibilities:
+
+- Verifies the delivery guide covers payload generation, cloud upload, cloud function deployment, mini program debugging/preview, test cloud environment setup, known limitations, and release testing.
+- Verifies the guide preserves existing HTML behavior, adds no indicators, protects complete payloads, and requires non-public cloud storage.
+- Verifies the root, API, and cloud-function README files link to the delivery guide.
 
 ### `tests/test_get_dashboard_section_cloudfunction.py`
 
@@ -674,6 +733,26 @@ Architecture insight:
 - WeChat Developer Tools project configuration belongs at the repository root because both mini program and cloud function roots are repository-relative siblings.
 - Local AppID and tool preferences belong in ignored `project.private.config.json`; duplicate project configs create ambiguous behavior depending on which directory is opened.
 - Real-device failures in `WAServiceMainContext.js` before project code evaluation should first be treated as Developer Tools/base-library/debug-package issues, not as page business-logic failures.
+
+### `tests/test_pre_release_security.py`
+
+Regression tests for implementation plan step 24 pre-release security acceptance.
+
+Key responsibilities:
+
+- Uses `git check-ignore` to verify private inputs, local databases, database sidecars, private project configuration, and generated staged payloads remain ignored.
+- Uses `git ls-files` to verify tracked files exclude `.env`, private project configuration, database snapshots, private key files, and `api/payload/`.
+- Verifies `.env.example` exposes only an empty `TUSHARE_TOKEN=` placeholder.
+- Scans mini program source files to ensure the package does not contain cloud storage paths, direct download APIs, `fileID`, backend tokens, SQLite references, or download credentials.
+- Verifies root `project.config.json` excludes environment IDs, tokens, secrets, credentials, and cloud URLs while allowing the public AppID.
+- Invokes the real `getDashboardSection` handler for all nine legal sections plus an invalid request.
+- Injects sensitive full-payload metadata into test payloads and verifies success/error responses cannot expose storage paths, file IDs, download credentials, builder metadata, or complete dashboard payloads.
+
+Architecture insight:
+
+- Security is enforced at three repository layers: ignore rules prevent private artifacts from entering version control, package scanning prevents backend details from entering the mini program bundle, and response-shape tests prevent cloud-function data overexposure.
+- Cloud storage ACLs cannot be proven by repository-only tests. Deployment must keep `marketpulse-payload/` non-public and inaccessible to direct mini program reads.
+- The cloud function may read complete stored payloads internally, but its public boundary remains the fixed section whitelist and centralized response builders.
 
 ### `tests/test_miniprogram_login.py`
 
@@ -851,7 +930,7 @@ Technical stack recommendation for the mini program implementation. It recommend
 
 ### `memory-bank/implementation-plan.md`
 
-Step-by-step implementation plan. Step 1 through Step 23 are complete as of 2026-06-07. Step 24, the pre-release security check, has not been started.
+Step-by-step implementation plan. Steps 1 through 25 are complete as of 2026-06-07.
 
 ### `memory-bank/progress.md`
 

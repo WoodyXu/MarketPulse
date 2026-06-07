@@ -13,8 +13,10 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+project_root_text = str(PROJECT_ROOT)
+if project_root_text in sys.path:
+    sys.path.remove(project_root_text)
+sys.path.insert(0, project_root_text)
 
 from config.consts import START_DATE  # noqa: E402
 from config.index_code import index_dict  # noqa: E402

@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -19,7 +22,54 @@ from tests.test_payload_contract import (
 )
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
 class UploadPayloadTest(unittest.TestCase):
+    def test_cli_prefers_this_repository_when_pythonpath_contains_conflicting_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            conflicting_root = tmp_path / "conflicting-project"
+            conflicting_config = conflicting_root / "config"
+            conflicting_config.mkdir(parents=True)
+            (conflicting_config / "__init__.py").write_text("", encoding="utf-8")
+            (conflicting_config / "consts.py").write_text(
+                'raise RuntimeError("loaded conflicting config")\n',
+                encoding="utf-8",
+            )
+
+            db_path = seed_full_market_database(tmp_path)
+            output_dir = tmp_path / "payload"
+            env = os.environ.copy()
+            env["PYTHONPATH"] = os.pathsep.join(
+                [str(conflicting_root), str(PROJECT_ROOT)]
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(PROJECT_ROOT / "api" / "upload_payload.py"),
+                    "--db-path",
+                    str(db_path),
+                    "--start-date",
+                    "2024-01-01",
+                    "--output-dir",
+                    str(output_dir),
+                    "--type",
+                    "beijing",
+                ],
+                cwd=PROJECT_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(
+                (output_dir / "marketpulse-payload" / "beijing_2024-02-01.json").exists()
+            )
+
     def test_generates_payload_json_matching_existing_builders(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = seed_full_market_database(Path(tmpdir))

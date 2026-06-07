@@ -1,7 +1,7 @@
 # MarketPulse API
 
-This directory contains the planned boundary between the existing local Python
-payload pipeline and the future WeChat cloud function layer.
+This directory contains the implemented boundary between the existing local
+Python payload pipeline and the WeChat cloud function layer.
 
 ## Responsibility split
 
@@ -15,7 +15,7 @@ payload pipeline and the future WeChat cloud function layer.
 - The mini program must not read SQLite, call external data providers, or
   download full payload JSON files directly from cloud storage.
 
-## Planned layout
+## Layout
 
 ```text
 api/
@@ -59,3 +59,20 @@ responses contain only the normalized `type`/`section` when available plus the
 handled error object. The function must not expose cloud storage paths, file
 IDs, download credentials, selected payload dates, or complete dashboard
 payloads.
+
+## Delivery
+
+The complete empty-environment staging, upload, deployment, cloud invocation,
+mini program preview, test-environment, and known-limitations instructions are
+in [`docs/delivery-guide.md`](../docs/delivery-guide.md).
+
+The required production order is:
+
+1. Generate payload files and `manifest.json`.
+2. Upload payload JSON files to non-public cloud storage.
+3. Upload `manifest.json` last.
+4. Deploy `getDashboardSection` with cloud-side dependency installation.
+5. Verify section calls through an authenticated mini program session.
+
+The repository intentionally does not commit a cloud environment ID, shared
+test account, storage credential, or provider-specific uploader.

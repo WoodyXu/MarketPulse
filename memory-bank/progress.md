@@ -1,5 +1,75 @@
 # Progress
 
+## 2026-06-07 - Step 25 documentation and delivery instructions
+
+- Completed implementation plan step 25 by adding `docs/delivery-guide.md`.
+- The delivery guide documents the complete first-version handoff flow:
+  - local Python and Node.js prerequisites;
+  - test WeChat cloud environment and developer-account requirements;
+  - local HTML validation without changing existing HTML output behavior;
+  - payload and manifest generation from the existing SQLite database;
+  - manual WeChat Developer Tools cloud-storage upload;
+  - provider-neutral `--upload-command` integration;
+  - payload-first and manifest-last upload ordering;
+  - `getDashboardSection` cloud deployment with cloud-side dependency installation;
+  - authenticated cloud function invocation checks;
+  - repository-root mini program debugging, cache/error/refresh checks, preview, and real-device validation;
+  - release commands, acceptance checklist, security boundaries, and known limitations.
+- Recorded that the repository does not provide or commit a shared test account, cloud environment ID, token, storage credential, or private database snapshot.
+- Kept the existing product boundaries explicit:
+  - the two Python payload builders remain the business-data source of truth;
+  - existing HTML templates, output paths, and behavior remain unchanged;
+  - no new indicators were added;
+  - the cloud function and mini program do not recalculate indicators;
+  - full staged payloads remain private and untracked.
+- Updated `README.md`, `api/README.md`, and `api/cloudfunctions/getDashboardSection/README.md` to link to the delivery guide and describe the implemented delivery/deployment boundary.
+- Added `tests/test_delivery_documentation.py` to lock the required step 25 topics, product boundaries, and README links.
+- While following the documented command from the repository root, found that an external `PYTHONPATH` entry could cause `api/upload_payload.py` to import another project's `config` package.
+- Fixed repository import precedence in:
+  - `api/upload_payload.py`;
+  - `src/security_market_pulse.py`;
+  - `src/beijing_real_estate_market_pulse.py`.
+- Expanded `tests/test_upload_payload.py` with a CLI subprocess regression test that injects a conflicting `config` package and verifies the upload script still imports this repository's modules.
+- Ran the production payload staging command against `data/market_data.sqlite`; it generated:
+  - `ashare_2026-06-05.json`;
+  - `beijing_2026-06-04.json`;
+  - `marketpulse-payload/manifest.json`.
+- External stock-name lookup was unavailable in the sandbox, but the existing fallback behavior allowed payload generation to complete.
+- Ran `python3 -m pytest`; all 66 tests passed.
+- Ran JavaScript syntax checks for the cloud function and all three mini program pages; they passed.
+- Ran Python syntax compilation with `PYTHONPYCACHEPREFIX` directed to `/tmp`; it passed.
+- Ran both existing HTML script `--help` entry points after the import-precedence fix; they passed.
+- Ran `git diff --check`; no whitespace errors were found.
+- The user reported validation complete on 2026-06-07.
+- Implementation plan steps 1 through 25 are complete.
+
+## 2026-06-07 - Step 24 pre-release security check
+
+- Completed implementation plan step 24 for repository secrets, generated payloads, private databases, mini program package boundaries, and cloud function response samples.
+- Hardened `.gitignore` so the following local or generated artifacts cannot be committed accidentally:
+  - SQLite and generic DB snapshots, including `-wal` and `-shm` sidecar files;
+  - the complete staged payload tree under `api/payload/`;
+  - the existing `.env`, `data/`, and root `project.private.config.json` private paths remain ignored.
+- Added `tests/test_pre_release_security.py`.
+- The pre-release security regression test verifies:
+  - `.env`, private project configuration, local databases, and staged payload files are ignored;
+  - tracked files do not include private configuration, database snapshots, private key files, or generated full payloads;
+  - `.env.example` contains only the empty `TUSHARE_TOKEN=` placeholder;
+  - mini program source files do not contain cloud storage object paths, `downloadFile`, `fileID`, backend tokens, SQLite paths, or download credentials;
+  - root `project.config.json` may contain the public WeChat AppID but does not contain environment IDs, tokens, secrets, credentials, or cloud URLs;
+  - all nine legal cloud function section response samples contain only `type`, `section`, and cropped `data`;
+  - invalid-section responses contain only normalized request fields and the handled error;
+  - injected full-payload metadata, cloud paths, file IDs, and download credentials cannot leak through response samples.
+- Repository-wide sensitive-value scanning outside tests and documentation found no populated token, API key, private key, cloud URL, or download credential.
+- Confirmed the real WeChat cloud storage access policy remains a deployment-environment responsibility: `marketpulse-payload/` must not allow direct mini program or public reads and must be readable only through the cloud function.
+- Ran `python3 -m pytest tests/test_pre_release_security.py -q`; all 4 tests passed.
+- Ran `python3 -m pytest`; all 62 tests passed.
+- Ran JavaScript syntax validation for `api/cloudfunctions/getDashboardSection/index.js`; it passed.
+- Ran Python syntax compilation for the new security test with `PYTHONPYCACHEPREFIX` directed to `/tmp`; it passed.
+- Ran `git diff --check`; no whitespace errors were found.
+- The user reported validation complete on 2026-06-07.
+- Step 25 has not been started. Next developer must update delivery documentation only after explicit instruction.
+
 ## 2026-06-07 - Step 23 mobile compatibility acceptance
 
 - Completed implementation plan step 23 for the overview home page, capital market page, and Beijing real estate page.

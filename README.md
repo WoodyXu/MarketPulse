@@ -1,11 +1,12 @@
 # MarketPulse
 
-`MarketPulse` 是一个本地数据更新与网页生成仓库，主要做两件事：
+`MarketPulse` 是一个本地数据更新、静态网页生成和微信小程序展示仓库，主要做三件事：
 
 1. 汇总并展示 A 股市场脉搏数据，包括沪深两市成交金额、融资余额、沪深 300 点位等；
-2. 汇总并展示北京房产市场脉搏数据，包括成交、挂牌、看房、信贷等指标。
+2. 汇总并展示北京房产市场脉搏数据，包括成交、挂牌、看房、信贷等指标；
+3. 复用相同 payload，通过微信云函数按 section 向原生小程序提供只读看板。
 
-仓库中的脚本会先读取本地 SQLite 数据库，再按需从外部数据源补数据，最后生成可直接打开的静态 HTML 页面。
+现有 Python 脚本和 HTML 输出仍是业务数据基线。小程序链路不会重写指标，也不会改变原有 HTML 模板、输出路径或生成行为。
 
 ## 仓库内容
 
@@ -14,8 +15,13 @@
 - `src/market_daily_info.py`：A 股相关数据抓取与清洗工具
 - `config/consts.py`：全局配置
 - `config/index_code.py`：指数代码配置
+- `api/upload_payload.py`：生成、暂存并可选上传小程序 payload
+- `api/cloudfunctions/getDashboardSection/`：按白名单 section 返回数据的微信云函数
+- `miniprogram/`：微信原生小程序
+- `docs/delivery-guide.md`：上传、部署、调试、预览和交付说明
+- `docs/payload-field-contract.md`：网页与小程序共享的 payload 字段契约
 - `tests/`：单元测试
-- `design-document.md`：设计说明
+- `memory-bank/design-document.md`：小程序产品设计说明
 
 ## 运行前准备
 
@@ -127,3 +133,24 @@ python3 src/beijing_real_estate_market_pulse.py --output-dir beijing_real_estate
 ```bash
 python3 -m pytest
 ```
+
+## 微信小程序交付
+
+完整流程见 [docs/delivery-guide.md](docs/delivery-guide.md)，包括：
+
+- 从 SQLite 生成 payload 和 manifest；
+- 上传到非公开微信云存储；
+- 部署 `getDashboardSection`；
+- 配置测试账号和测试云环境；
+- 微信开发者工具调试、云函数调用和真机预览；
+- 安全检查、验收清单和已知限制。
+
+快速本地生成：
+
+```bash
+python3 api/upload_payload.py \
+  --db-path data/market_data.sqlite \
+  --start-date 2010-01-01
+```
+
+生成的完整 payload 位于忽略目录 `api/payload/`，不得提交或公开。

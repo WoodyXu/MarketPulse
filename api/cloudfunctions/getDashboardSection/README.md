@@ -1,9 +1,9 @@
 # getDashboardSection Cloud Function
 
-This directory reserves the planned WeChat cloud function that will serve mini
-program dashboard sections.
+This directory contains the WeChat cloud function that serves mini program
+dashboard sections.
 
-The current implementation covers step 6, step 7, step 8, and step 9. It:
+The current implementation:
 
 - Checks the WeChat cloud function login context.
 - Returns a handled `UNAUTHENTICATED` error when `OPENID` is missing.
@@ -35,3 +35,22 @@ Whitelisted sections:
 - `beijing.lianjiaDeals`
 - `beijing.onlineSignings`
 - `beijing.credit`
+
+## Deployment
+
+Open the repository root in WeChat Developer Tools, select the non-production
+cloud environment containing the staged payloads, then deploy this directory
+with the option equivalent to "upload and deploy: install dependencies in the
+cloud".
+
+The function must be deployed in an environment that can read:
+
+- `marketpulse-payload/manifest.json`
+- every payload object referenced by the manifest
+
+Use an authenticated mini program session for the real invocation check so the
+WeChat runtime supplies `OPENID`. Do not make the payload directory public to
+work around missing storage permissions.
+
+See [`docs/delivery-guide.md`](../../../docs/delivery-guide.md) for the complete
+upload, deployment, preview, acceptance, and rollback-safe ordering.
