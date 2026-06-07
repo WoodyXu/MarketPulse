@@ -1,14 +1,17 @@
 page {
   min-height: 100%;
+  overflow-x: hidden;
   background: #f7faf8;
   color: #17231c;
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 .page {
+  width: 100%;
   min-height: 100vh;
   box-sizing: border-box;
   padding: 32rpx 28rpx 48rpx;
+  overflow-x: hidden;
 }
 
 .page-title {
@@ -26,6 +29,7 @@ page {
 }
 
 .panel {
+  width: 100%;
   box-sizing: border-box;
   margin-bottom: 24rpx;
   padding: 28rpx;
@@ -52,4 +56,70 @@ page {
   color: #66756c;
   font-size: 28rpx;
   line-height: 1.6;
+}
+
+.auth-panel {
+  padding-bottom: 32rpx;
+}
+
+.avatar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 132rpx;
+  height: 132rpx;
+  margin: 28rpx 0 24rpx;
+  padding: 0;
+  border: 1rpx solid #dce8df;
+  border-radius: 66rpx;
+  background: #f7faf8;
+  color: #66756c;
+  font-size: 24rpx;
+}
+
+.avatar-button::after {
+  border: 0;
+}
+
+.avatar-preview {
+  width: 132rpx;
+  height: 132rpx;
+  border-radius: 66rpx;
+}
+
+.avatar-placeholder {
+  color: #66756c;
+}
+
+.nickname-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 88rpx;
+  margin-bottom: 24rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid #dce8df;
+  border-radius: 12rpx;
+  background: #ffffff;
+  font-size: 28rpx;
+}
+
+.primary-button {
+  width: 100%;
+  margin: 0;
+  border-radius: 12rpx;
+  background: #2f8f57;
+  color: #ffffff;
+  font-size: 30rpx;
+}
+
+.primary-button::after {
+  border: 0;
+}
+
+.auth-error {
+  display: block;
+  margin-top: 18rpx;
+  color: #b54708;
+  font-size: 26rpx;
+  line-height: 1.5;
 }

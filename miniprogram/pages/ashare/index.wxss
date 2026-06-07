@@ -1,6 +1,8 @@
 .tabs {
+  width: auto;
   margin: 0 -28rpx 24rpx;
-  padding-left: 28rpx;
+  box-sizing: border-box;
+  padding: 0 28rpx;
   white-space: nowrap;
 }
 
@@ -20,4 +22,163 @@
   background: #e8f5ed;
   color: #1f6f43;
   font-weight: 700;
+}
+
+.section-placeholder {
+  width: 100%;
+  min-width: 0;
+  margin-top: 8rpx;
+}
+
+.chart-card {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #edf2ee;
+}
+
+.chart-card:first-child {
+  margin-top: 12rpx;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.chart-title {
+  display: block;
+  margin-bottom: 16rpx;
+  color: #25352d;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.chart-box {
+  width: 100%;
+  min-width: 0;
+  height: 520rpx;
+  overflow: hidden;
+}
+
+.stock-section {
+  margin-top: 28rpx;
+}
+
+.stock-section-title {
+  display: block;
+  margin-bottom: 16rpx;
+  color: #25352d;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.stock-table-card {
+  margin-top: 18rpx;
+  padding: 18rpx 0 8rpx;
+  border-top: 1rpx solid #edf2ee;
+}
+
+.stock-date {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #5a6b61;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.stock-table-scroll {
+  width: 100%;
+  max-width: 100%;
+}
+
+.stock-table {
+  min-width: 680rpx;
+}
+
+.stock-row {
+  display: flex;
+  align-items: center;
+  min-height: 68rpx;
+  border-bottom: 1rpx solid #eef3ef;
+}
+
+.stock-head {
+  min-height: 56rpx;
+  color: #6b7b70;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.stock-cell {
+  display: block;
+  padding: 12rpx 10rpx;
+  color: #25352d;
+  font-size: 24rpx;
+  box-sizing: border-box;
+}
+
+.stock-name {
+  width: 300rpx;
+  flex: 0 0 300rpx;
+}
+
+.stock-amount {
+  width: 220rpx;
+  flex: 0 0 220rpx;
+  text-align: right;
+}
+
+.stock-change {
+  width: 160rpx;
+  flex: 0 0 160rpx;
+  text-align: right;
+}
+
+.stock-name-text {
+  display: block;
+  overflow: hidden;
+  color: #25352d;
+  font-size: 24rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-code {
+  display: block;
+  margin-top: 4rpx;
+  color: #7b8b81;
+  font-size: 20rpx;
+}
+
+.stock-up {
+  color: #b42318;
+}
+
+.stock-down {
+  color: #1f6f43;
+}
+
+.error-state {
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid #f3c8c3;
+  border-radius: 8rpx;
+  background: #fff7f6;
+}
+
+.loading-state {
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+}
+
+.error-text {
+  display: block;
+  margin-bottom: 14rpx;
+  color: #b42318;
+  font-size: 24rpx;
+}
+
+.retry-button {
+  margin: 0;
+  border-color: #2f8f57;
+  color: #1f6f43;
+  font-size: 24rpx;
 }

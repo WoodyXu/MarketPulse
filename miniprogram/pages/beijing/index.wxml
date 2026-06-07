@@ -2,14 +2,73 @@
   <view class="page-title">北京楼市</view>
   <view class="page-subtitle">成交、挂牌、看房与信贷看板</view>
 
-  <scroll-view class="tabs" scroll-x="true">
-    <block wx:for="{{tabs}}" wx:key="key">
-      <view class="tab {{activeTab === item.key ? 'tab-active' : ''}}">{{item.title}}</view>
-    </block>
-  </scroll-view>
+  <view wx:if="{{!loginState.loggedIn}}" class="panel auth-panel">
+    <text class="panel-title">登录后查看看板</text>
+    <text class="panel-desc">请选择头像并填写昵称</text>
+    <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{authForm.avatarUrl}}" class="avatar-preview" src="{{authForm.avatarUrl}}" mode="aspectFill"></image>
+      <text wx:else class="avatar-placeholder">选择头像</text>
+    </button>
+    <input class="nickname-input" type="nickname" placeholder="填写昵称" value="{{authForm.nickName}}" bindinput="onNicknameInput" />
+    <button class="primary-button" loading="{{authLoading}}" bindtap="submitLogin">登录</button>
+    <text wx:if="{{authError}}" class="auth-error">{{authError}}</text>
+  </view>
 
-  <view class="panel">
-    <text class="panel-title">工程骨架已初始化</text>
-    <text class="placeholder">第 10 步仅创建页面与组件目录。登录、请求、缓存和图表渲染将在后续步骤实现。</text>
+  <view wx:else>
+    <scroll-view class="tabs" scroll-x="true" enable-flex="true" show-scrollbar="false">
+      <block wx:for="{{tabs}}" wx:key="key">
+        <view
+          class="tab {{activeTab === item.key ? 'tab-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onTapTab"
+        >
+          {{item.title}}
+        </view>
+      </block>
+    </scroll-view>
+
+    <view class="panel">
+      <text class="panel-title">{{activeTabTitle}}</text>
+
+      <scroll-view
+        wx:if="{{activeTab === 'credit'}}"
+        class="sub-tabs"
+        scroll-x="true"
+        enable-flex="true"
+        show-scrollbar="false"
+      >
+        <block wx:for="{{creditTabs}}" wx:key="key">
+          <view
+            class="sub-tab {{activeCreditTab === item.key ? 'sub-tab-active' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="onTapCreditTab"
+          >
+            {{item.title}}
+          </view>
+        </block>
+      </scroll-view>
+
+      <view wx:if="{{activeSectionState.loading}}" class="loading-state">
+        <text class="placeholder">数据加载中...</text>
+      </view>
+      <view wx:if="{{activeSectionState.error}}" class="error-state">
+        <text class="error-text">{{activeSectionState.error}}</text>
+        <button class="retry-button" size="mini" bindtap="retryActiveSection">重试</button>
+      </view>
+      <view wx:if="{{activeSectionState.loaded}}" class="section-placeholder">
+        <block wx:if="{{activeSectionState.chartCards.length}}">
+          <block wx:for="{{activeSectionState.chartCards}}" wx:key="key" wx:for-item="chart">
+            <view class="chart-card">
+              <text class="chart-title">{{chart.title}}</text>
+              <view class="chart-box">
+                <ec-canvas canvas-id="{{chart.canvasId}}" ec="{{chart.ec}}"></ec-canvas>
+              </view>
+            </view>
+          </block>
+        </block>
+        <text wx:else class="placeholder">暂无可展示数据</text>
+      </view>
+      <text wx:if="{{!activeSectionState.loading && !activeSectionState.error && !activeSectionState.loaded}}" class="placeholder">切换到当前指标后加载数据。</text>
+    </view>
   </view>
 </view>

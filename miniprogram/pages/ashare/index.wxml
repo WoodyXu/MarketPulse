@@ -2,14 +2,82 @@
   <view class="page-title">资本市场</view>
   <view class="page-subtitle">A 股市场状态看板</view>
 
-  <scroll-view class="tabs" scroll-x="true">
-    <block wx:for="{{tabs}}" wx:key="key">
-      <view class="tab {{activeTab === item.key ? 'tab-active' : ''}}">{{item.title}}</view>
-    </block>
-  </scroll-view>
+  <view wx:if="{{!loginState.loggedIn}}" class="panel auth-panel">
+    <text class="panel-title">登录后查看看板</text>
+    <text class="panel-desc">请选择头像并填写昵称</text>
+    <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{authForm.avatarUrl}}" class="avatar-preview" src="{{authForm.avatarUrl}}" mode="aspectFill"></image>
+      <text wx:else class="avatar-placeholder">选择头像</text>
+    </button>
+    <input class="nickname-input" type="nickname" placeholder="填写昵称" value="{{authForm.nickName}}" bindinput="onNicknameInput" />
+    <button class="primary-button" loading="{{authLoading}}" bindtap="submitLogin">登录</button>
+    <text wx:if="{{authError}}" class="auth-error">{{authError}}</text>
+  </view>
 
-  <view class="panel">
-    <text class="panel-title">工程骨架已初始化</text>
-    <text class="placeholder">第 10 步仅创建页面与组件目录。登录、请求、缓存和图表渲染将在后续步骤实现。</text>
+  <view wx:else>
+    <scroll-view class="tabs" scroll-x="true" enable-flex="true" show-scrollbar="false">
+      <block wx:for="{{tabs}}" wx:key="key">
+        <view
+          class="tab {{activeTab === item.key ? 'tab-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onTapTab"
+        >
+          {{item.title}}
+        </view>
+      </block>
+    </scroll-view>
+
+    <view class="panel">
+      <text class="panel-title">{{activeTabTitle}}</text>
+      <view wx:if="{{activeSectionState.loading}}" class="loading-state">
+        <text class="placeholder">数据加载中...</text>
+      </view>
+      <view wx:if="{{activeSectionState.error}}" class="error-state">
+        <text class="error-text">{{activeSectionState.error}}</text>
+        <button class="retry-button" size="mini" bindtap="retryActiveSection">重试</button>
+      </view>
+      <view wx:if="{{activeSectionState.loaded}}" class="section-placeholder">
+        <block wx:for="{{activeSectionState.chartCards}}" wx:key="key" wx:for-item="chart">
+          <view class="chart-card">
+            <text class="chart-title">{{chart.title}}</text>
+            <view class="chart-box">
+              <ec-canvas canvas-id="{{chart.canvasId}}" ec="{{chart.ec}}"></ec-canvas>
+            </view>
+          </view>
+        </block>
+
+        <view wx:if="{{activeTab === 'topConcentration'}}" class="stock-section">
+          <text class="stock-section-title">最近 5 个交易日 Top5 股票</text>
+          <block wx:if="{{activeSectionState.topStockTables.length}}">
+            <block wx:for="{{activeSectionState.topStockTables}}" wx:key="date" wx:for-item="table">
+              <view class="stock-table-card">
+                <text class="stock-date">{{table.date}}</text>
+                <scroll-view class="stock-table-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
+                  <view class="stock-table">
+                    <view class="stock-row stock-head">
+                      <text class="stock-cell stock-name">股票名称</text>
+                      <text class="stock-cell stock-amount">成交金额</text>
+                      <text class="stock-cell stock-change">涨跌幅</text>
+                    </view>
+                    <block wx:for="{{table.stocks}}" wx:key="code" wx:for-item="stock">
+                      <view class="stock-row">
+                        <view class="stock-cell stock-name">
+                          <text class="stock-name-text">{{stock.displayName}}</text>
+                          <text class="stock-code">{{stock.code}}</text>
+                        </view>
+                        <text class="stock-cell stock-amount">{{stock.amountText}}</text>
+                        <text class="stock-cell stock-change {{stock.pctChgClass}}">{{stock.pctChgText}}</text>
+                      </view>
+                    </block>
+                  </view>
+                </scroll-view>
+              </view>
+            </block>
+          </block>
+          <text wx:else class="placeholder">暂无可展示数据</text>
+        </view>
+      </view>
+      <text wx:if="{{!activeSectionState.loading && !activeSectionState.error && !activeSectionState.loaded}}" class="placeholder">切换到当前指标后加载数据。</text>
+    </view>
   </view>
 </view>

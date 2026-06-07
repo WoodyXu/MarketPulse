@@ -4,6 +4,7 @@
 
 .board-entry {
   position: relative;
+  padding-right: 72rpx;
 }
 
 .board-entry::after {

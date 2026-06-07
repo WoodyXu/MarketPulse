@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "资本市场",
+  "enablePullDownRefresh": true,
   "usingComponents": {
     "ec-canvas": "/components/ec-canvas/ec-canvas"
   }

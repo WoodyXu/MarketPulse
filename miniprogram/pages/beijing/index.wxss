@@ -1,6 +1,8 @@
 .tabs {
+  width: auto;
   margin: 0 -28rpx 24rpx;
-  padding-left: 28rpx;
+  box-sizing: border-box;
+  padding: 0 28rpx;
   white-space: nowrap;
 }
 
@@ -20,4 +22,88 @@
   background: #e8f5ed;
   color: #1f6f43;
   font-weight: 700;
+}
+
+.sub-tabs {
+  width: auto;
+  margin: 4rpx -8rpx 22rpx;
+  padding: 0 8rpx;
+  white-space: nowrap;
+}
+
+.sub-tab {
+  display: inline-block;
+  margin-right: 12rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #f4f8f5;
+  color: #5a6b61;
+  font-size: 24rpx;
+}
+
+.sub-tab-active {
+  background: #2f8f57;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.section-placeholder {
+  width: 100%;
+  min-width: 0;
+  margin-top: 8rpx;
+}
+
+.chart-card {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #edf2ee;
+}
+
+.chart-card:first-child {
+  margin-top: 12rpx;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.chart-title {
+  display: block;
+  margin-bottom: 16rpx;
+  color: #25352d;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.chart-box {
+  width: 100%;
+  min-width: 0;
+  height: 520rpx;
+  overflow: hidden;
+}
+
+.error-state {
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid #f3c8c3;
+  border-radius: 8rpx;
+  background: #fff7f6;
+}
+
+.loading-state {
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+}
+
+.error-text {
+  display: block;
+  margin-bottom: 14rpx;
+  color: #b42318;
+  font-size: 24rpx;
+}
+
+.retry-button {
+  margin: 0;
+  border-color: #2f8f57;
+  color: #1f6f43;
+  font-size: 24rpx;
 }
